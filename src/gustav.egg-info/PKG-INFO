@@ -1,0 +1,11 @@
+Metadata-Version: 2.4
+Name: gustav
+Version: 0.1.0
+Summary: Copiloto de IA por voz para o IL-2 Sturmovik: Great Battles
+Requires-Python: >=3.11
+Requires-Dist: anthropic
+Requires-Dist: faster-whisper
+Requires-Dist: numpy
+Requires-Dist: piper-tts
+Requires-Dist: python-dotenv
+Requires-Dist: sounddevice

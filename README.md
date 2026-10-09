@@ -2,7 +2,7 @@
 
 Copiloto de IA por voz para o **IL-2 Sturmovik: Great Battles**. Você fala com ele enquanto voa; ele acompanha a telemetria do avião em tempo real e responde, lê checklists e avisa de problemas.
 
-> **Estado do projeto:** início do desenvolvimento. A captura de telemetria (Fase 0) está implementada; voz, conversa e alertas ainda não. O plano completo está em [PLANO.md](PLANO.md).
+> **Estado do projeto:** início do desenvolvimento. A captura de telemetria (Fase 0) está concluída e validada em voo; voz, conversa e alertas ainda não. O plano completo está em [PLANO.md](PLANO.md).
 
 ## O que ele vai fazer
 
@@ -63,6 +63,26 @@ O [tools/sniff_telemetry.py](tools/sniff_telemetry.py) escuta a telemetria do jo
 
 Opções: `--no-record` só mostra, sem gravar; `--raw` despeja cada pacote em hexadecimal.
 
+## Conversa por voz (Fase 1)
+
+Instalação, uma vez, na pasta do projeto:
+
+```
+python -m venv .venv
+.venv\Scripts\pip install -e .
+.venv\Scripts\python -m piper.download_voices pt_BR-faber-medium --download-dir models
+```
+
+Crie um arquivo `.env` com `ANTHROPIC_API_KEY=...` e ajuste microfone, saída de áudio e tecla de falar no [config.toml](config.toml). Depois:
+
+```
+.venv\Scripts\python -m copilot.main
+```
+
+Segure a tecla de falar (padrão: `0` do teclado numérico, com NumLock ligado), faça a pergunta e solte. Apertar a tecla de novo interrompe a resposta. A cada troca o terminal mostra a transcrição e a latência.
+
+`--texto "pergunta"` responde a uma pergunta digitada; `--dispositivos` lista microfones e saídas de áudio.
+
 ## Limites conhecidos
 
 A telemetria do jogo não inclui combustível, temperaturas, munição, posição no mapa nem outros aviões. O copiloto diz quando não tem o dado em vez de chutar. O [PLANO.md](PLANO.md) descreve como parte disso pode ser contornada.
@@ -71,12 +91,12 @@ A telemetria do jogo não inclui combustível, temperaturas, munição, posiçã
 
 | Parte | Escolha |
 |---|---|
-| Linguagem | Python 3.12 |
+| Linguagem | Python 3.11 ou mais novo |
 | Telemetria | `asyncio` (UDP) |
 | Transcrição | `faster-whisper` em CPU |
 | Modelo de linguagem | Claude (API da Anthropic) |
 | Síntese de voz | Piper |
-| Push-to-talk | botão do joystick via `pygame` |
+| Push-to-talk | tecla global do Windows (padrão: `0` do teclado numérico) |
 
 Transcrição e voz rodam em CPU para deixar a placa de vídeo livre para o VR.
 
@@ -84,7 +104,7 @@ Transcrição e voz rodam em CPU para deixar a placa de vídeo livre para o VR.
 
 - Windows 10 ou 11
 - IL-2 Sturmovik: Great Battles (Stalingrad ou posterior)
-- Python 3.12
+- Python 3.11 ou mais novo
 - Microfone e fone de ouvido (a partir da Fase 1)
 - Chave da API da Anthropic (a partir da Fase 1)
 
@@ -92,8 +112,8 @@ Transcrição e voz rodam em CPU para deixar a placa de vídeo livre para o VR.
 
 | Fase | Entrega | Estado |
 |---|---|---|
-| 0 | Captura e decodificação da telemetria UDP | Implementada |
-| 1 | Conversa por voz, ainda sem dados do jogo | A fazer |
+| 0 | Captura e decodificação da telemetria UDP | Concluída |
+| 1 | Conversa por voz, ainda sem dados do jogo | Implementada, falta validar em voo |
 | 2 | Copiloto respondendo com dados reais do voo | A fazer |
 | 3 | Alertas proativos | A fazer |
 | 4 | Checklists guiados e demais variantes do Bf 109 | A fazer |

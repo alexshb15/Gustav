@@ -21,7 +21,7 @@ Exemplos do que deve funcionar:
 | Papel do copiloto | Só aconselha; nunca aperta teclas nem envia comandos ao jogo | Confirmado |
 | Sistema | Windows 11, tudo rodando no mesmo PC do jogo | — |
 | Idioma da conversa | Português do Brasil; jogo em inglês | — |
-| Linguagem | Python 3.12 | — |
+| Linguagem | Python 3.11 ou mais novo | — |
 
 ### O que o VR muda
 
@@ -79,13 +79,41 @@ O Great Battles envia telemetria por UDP quando habilitado em `data/startup.cfg`
 [END]
 ```
 
-**Disponível pela telemetria (a confirmar campo a campo na Fase 0):**
+**Disponível pela telemetria (confirmado na Fase 0, voo de 08/10/2026 em Bf 109 F-4):**
 
-- Motor: RPM e pressão de admissão por motor
-- Velocidade indicada, ângulo de ataque, altura sobre o solo (AGL)
-- Trem de pouso, flaps, freios aerodinâmicos
-- Acelerações (carga G), atitude (arfagem, rolagem, guinada) e taxas de rotação
-- Eventos: disparo de armas, bomba/foguete lançado, impacto recebido, dano, explosão
+Os dois canais chegam a 25 Hz (tick do jogo a 50 Hz, `decimation = 2`), sem erro de decodificação em 11 minutos.
+
+| Campo | Unidade e comportamento medido |
+|---|---|
+| RPM | rpm, um valor por motor |
+| Pressão de admissão | Pa, um valor por motor. Para ata, dividir por 101 325 (atmosfera padrão): assim os patamares batem com 1,42 ata a 2700 rpm e 1,15 ata a 2300 rpm |
+| Velocidade indicada | m/s |
+| Ângulo de ataque | rad. Só é confiável em voo; no chão e em baixa velocidade oscila entre ±180° |
+| Altura sobre o solo | m, medida de um ponto do avião: marca de 0,9 a 1,9 m com as rodas no chão |
+| Trem de pouso | 0 = recolhido, 1 = baixado, um valor por perna (esquerda, direita, bequilha), com valores intermediários durante o curso |
+| Compressão do trem | 0 a 1 por perna; serve como "peso nas rodas". A bequilha fica parada em 0,17 em voo |
+| Flaps | 0 a 1, contínuo (volante manual do 109) |
+| Freios aerodinâmicos | Sempre 0 no 109 |
+| Aceleração | m/s² nos eixos do avião, com a gravidade incluída: Y é o vertical (9,8 parado). Carga G = Y / 9,81 |
+| Vibração do motor e da cabine | Frequência e amplitude; sem uso previsto |
+| Atitude (canal de movimento) | Guinada, arfagem e rolagem em rad, taxas de rotação em rad/s, aceleração em m/s² |
+
+Eventos, com a numeração real (um a mais do que a documentação antiga indicava):
+
+| ID | Evento | Estado |
+|---|---|---|
+| 0 | Nome do avião em texto ("Bf 109 F-4") | Confirmado. Permite carregar a base do avião certo sem perguntar |
+| 1 | Motor: posição e RPM máximo (2800 no F-4) | Confirmado |
+| 2 | Arma: posição, massa do projétil e velocidade de boca | Confirmado |
+| 3 | Perna do trem: posição | Confirmado |
+| 4 a 8 | Bomba, foguete, impacto, dano, explosão | Não ocorreram no voo; layout presumido |
+| 9 | Disparo, com o índice da arma | Confirmado |
+| 13 | Dados do jogador (traz o nome) | Layout parcial |
+| 14 | Desconhecido, 6 bytes | — |
+
+Os eventos 0 a 3 e 14 se repetem a cada 10 segundos. O tick volta a zero quando a missão recomeça, o que serve para detectar um voo novo.
+
+**Ainda sem validação:** o trem cedeu no pouso do voo de teste e nenhum evento de dano chegou, então o alerta de "dano recebido" da Fase 3 depende de um voo com dano de combate para confirmar os eventos 6 e 7.
 
 **Não disponível pela telemetria:**
 
@@ -108,7 +136,7 @@ Essa lacuna define o que o copiloto consegue ou não fazer. Formas de cobri-la, 
 | Componente | Escolha | Motivo |
 |---|---|---|
 | Telemetria | `asyncio` UDP + `struct` | Protocolo binário simples, sem dependência |
-| PTT | `pygame`/`inputs` lendo botão do joystick | Não rouba foco do jogo; teclado como alternativa |
+| PTT | Tecla global lida com `GetAsyncKeyState` (padrão: `0` do teclado numérico) | Funciona com o jogo em foco e sem dependência; botão do HOTAS pode ser mapeado para a tecla |
 | Captura de áudio | `sounddevice` | Baixa latência no Windows |
 | STT | `faster-whisper` modelo `small` em CPU (int8) | Local e sem custo, deixa a GPU livre para o VR. Se a CPU não der conta junto com o jogo, STT em nuvem |
 | LLM | Claude API, streaming, com tool use e prompt caching | `claude-haiku-4-5-20251001` para respostas rápidas em voo; `claude-opus-5-5` para perguntas complexas e visão |
@@ -132,7 +160,7 @@ O prompt de sistema define o personagem: copiloto de rádio, frases curtas, unid
 
 ## 7. Fases
 
-### Fase 0 — Validação da telemetria (1–2 dias)
+### Fase 0 — Validação da telemetria (concluída em 08/10/2026)
 - Habilitar UDP no `startup.cfg`, capturar pacotes e decodificar.
 - Documentar exatamente quais campos chegam, unidades e frequência.
 - **Critério de saída:** script que imprime velocidade, AGL, RPM, trem e flaps ao vivo durante um voo.
@@ -205,11 +233,9 @@ Apertar teclas pelo copiloto está fora do escopo por decisão sua.
 
 ## 10. Próximo passo
 
-Executar a Fase 0:
+A Fase 0 está concluída e a seção 4 reflete o que foi medido. Executar a Fase 1:
 
-1. Copiar `data/startup.cfg` para `startup.cfg.bak`.
-2. Acrescentar as seções `telemetrydevice` e `motiondevice` da seção 4.
-3. Escrever o `tools/sniff_telemetry.py`.
-4. Voar 10 minutos de Bf 109 gravando os pacotes.
-
-O resultado confirma ou corrige a seção 4 antes de qualquer outro código.
+1. Definir a chave da API da Anthropic em `ANTHROPIC_API_KEY`.
+2. Escolher o botão do HOTAS para o push-to-talk e anotar os dispositivos de áudio (microfone e saída do headset).
+3. Criar o `pyproject.toml` e o esqueleto de `src/copilot/`.
+4. Montar a cadeia PTT → Whisper → Claude → Piper e medir a latência.

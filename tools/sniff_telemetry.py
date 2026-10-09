@@ -38,8 +38,10 @@ ITEM_HEADER = struct.Struct("<HB")
 # ID (u32), tick (u32), guinada/arfagem/rolagem, rotação xyz, aceleração xyz
 MOTION_PACKET = struct.Struct("<II9f")
 
-# Uma atmosfera técnica (kgf/cm²), a "ata" dos manômetros alemães, em pascal.
-PA_PER_ATA = 98066.5
+# O jogo converte a "ata" do manômetro por atmosfera padrão, não pela atmosfera
+# técnica: no Bf 109 F-4 os patamares medidos foram 143 760 Pa a 2700 rpm
+# (emergência, 1,42 ata) e ~117 500 Pa a 2300 rpm (contínua, 1,15 ata).
+PA_PER_ATA = 101325.0
 
 RPM, MANIFOLD, ENG_SHAKE_FRQ, ENG_SHAKE_AMP, GEAR, GEAR_PRESS = range(6)
 EAS, AOA, ACCEL, COCKPIT_SHAKE, AGL, FLAPS, AIR_BRAKES = range(6, 13)
@@ -61,19 +63,26 @@ INDICATORS = {
     AIR_BRAKES: ("AIR_BRAKES", "0..1"),
 }
 
-GUN_FIRE = 8
+AIRCRAFT_NAME = 0
+GUN_FIRE = 9
+# Reenviados pelo jogo a cada ~10 s; ao vivo só aparecem quando mudam.
+SETUP_EVENTS = {0, 1, 2, 3, 13, 14}
 
-# id -> (nome, layout presumido, campos)
+# id -> (nome, layout, campos). Layout None = sem layout fixo ou ainda não decifrado.
+# Confirmados em voo (Bf 109 F-4): 0, 1, 2, 3 e 9. Os de 4 a 8 são presumidos,
+# ainda não vistos. 13 traz o nome do jogador; 14 é desconhecido.
 EVENTS = {
-    0: ("SETUP_ENG", "<hh3ff", "indice id x y z rpm_max"),
-    1: ("SETUP_GUN", "<h3fff", "indice x y z massa_projetil velocidade"),
-    2: ("SETUP_LGEAR", "<hh3f", "indice id x y z"),
-    3: ("DROP_BOMB", "<3ffH", "x y z massa tipo"),
-    4: ("ROCKET_LAUNCH", "<3fffH", "x y z massa raio tipo"),
-    5: ("HIT", "<3f3f", "x y z fx fy fz"),
-    6: ("DAMAGE", "<3f3f", "x y z fx fy fz"),
-    7: ("EXPLOSION", "<3ff", "x y z raio"),
+    AIRCRAFT_NAME: ("AIRCRAFT_NAME", None, ""),
+    1: ("SETUP_ENG", "<hh3ff", "indice id x y z rpm_max"),
+    2: ("SETUP_GUN", "<h3fff", "indice x y z massa_projetil velocidade"),
+    3: ("SETUP_LGEAR", "<hh3f", "indice id x y z"),
+    4: ("DROP_BOMB", "<3ffH", "x y z massa tipo"),
+    5: ("ROCKET_LAUNCH", "<3fffH", "x y z massa raio tipo"),
+    6: ("HIT", "<3f3f", "x y z fx fy fz"),
+    7: ("DAMAGE", "<3f3f", "x y z fx fy fz"),
+    8: ("EXPLOSION", "<3ff", "x y z raio"),
     GUN_FIRE: ("GUN_FIRE", "<B", "indice"),
+    13: ("PLAYER_INFO", None, ""),
 }
 
 RECORD_MAGIC = b"IL2REC1\n"
@@ -126,6 +135,9 @@ def parse_motion(data: bytes):
 
 def describe_event(event_id: int, payload: bytes) -> str:
     name, layout, fields = EVENTS.get(event_id, (f"EVENTO_{event_id}", None, ""))
+    if event_id == AIRCRAFT_NAME and payload:
+        # tamanho (u8) seguido do nome terminado em zero
+        return f"{name}: " + payload[1:].split(b"\x00")[0].decode("ascii", "replace")
     if layout is None or struct.calcsize(layout) != len(payload):
         return f"{name} ({len(payload)} bytes, layout desconhecido): {payload.hex(' ')}"
     values = struct.unpack(layout, payload)
@@ -224,7 +236,7 @@ class Stats:
             name, layout, _ = EVENTS.get(event_id, (f"DESCONHECIDO_{event_id}", None, ""))
             sizes = sorted(self.event_sizes[event_id])
             note = ""
-            if layout is None or sizes != [struct.calcsize(layout)]:
+            if event_id not in EVENTS or (layout and sizes != [struct.calcsize(layout)]):
                 note = "   <-- layout a revisar"
             lines.append(f"  {event_id:>2} {name:<14} {self.event_counts[event_id]:>6}x  tamanhos {sizes}{note}")
         if not self.event_counts:
@@ -314,6 +326,8 @@ def main() -> int:
     indicators = {}
     motion = None
     gun_shots = 0
+    setup_shown = {}                     # (id, 2 primeiros bytes) -> tamanho já mostrado
+    last_tick = None
     start = time.perf_counter()
     last_line = start
     last_packet = None
@@ -342,11 +356,20 @@ def main() -> int:
                         stats.indicators(new_indicators)
                         stats.events(events)
                         indicators.update(new_indicators)
+                        if last_tick is not None and tick < last_tick:
+                            print(f"    >> {now - start:7.1f}s  tick reiniciou: novo voo")
+                            setup_shown.clear()
+                        last_tick = tick
                         for event_id, payload in events:
                             if event_id == GUN_FIRE:
                                 gun_shots += 1
-                            else:
-                                print(f"    >> {now - start:7.1f}s  {describe_event(event_id, payload)}")
+                                continue
+                            if event_id in SETUP_EVENTS:
+                                key = (event_id, payload[:2])
+                                if setup_shown.get(key) == len(payload):
+                                    continue
+                                setup_shown[key] = len(payload)
+                            print(f"    >> {now - start:7.1f}s  {describe_event(event_id, payload)}")
                     else:
                         tick, motion = parse_motion(data)
                         stats.packet(MOTION_PORT, now, tick)

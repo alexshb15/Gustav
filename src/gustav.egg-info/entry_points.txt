@@ -1,0 +1,2 @@
+[console_scripts]
+gustav = copilot.main:main
