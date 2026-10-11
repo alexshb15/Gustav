@@ -13,6 +13,8 @@ import ctypes
 import sys
 import time
 import tomllib
+import wave
+from datetime import datetime
 from pathlib import Path
 
 import anthropic
@@ -34,6 +36,27 @@ def voice_path(name: str) -> Path:
         sys.exit(f"Voz não encontrada em {path}. Baixe com:\n"
                  f"    python -m piper.download_voices {name} --download-dir models")
     return path
+
+
+def snapshot(state, knowledge) -> str:
+    """Retrato dos instrumentos, com o regime do motor já classificado pela ficha do avião."""
+    text = state.describe()
+    engine = state.engine()
+    line = knowledge.engine_line(state.aircraft, engine[0]) if engine and engine[1] >= 50 else None
+    return f"{text}\n{line}" if line else text
+
+
+def save_recording(recording, text: str):
+    """Guarda a fala e a transcrição em captures/voz/, para avaliar o reconhecimento depois."""
+    folder = ROOT / "captures" / "voz"
+    folder.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    with wave.open(str(folder / f"{stamp}.wav"), "wb") as f:
+        f.setnchannels(1)
+        f.setsampwidth(2)
+        f.setframerate(16000)
+        f.writeframes((recording.clip(-1, 1) * 32767).astype("int16").tobytes())
+    (folder / f"{stamp}.txt").write_text(text + "\n", encoding="utf-8")
 
 
 def answer(brain, speaker, user_text: str, t0: float, telemetry: str | None = None,
@@ -118,8 +141,9 @@ def main() -> int:
 
     if args.texto:
         time.sleep(1.5)  # tempo para a telemetria chegar, se houver
-        print(state.describe())
-        answer(brain, speaker, args.texto, time.perf_counter(), state.describe(), state.aircraft)
+        telemetry = snapshot(state, knowledge)
+        print(telemetry)
+        answer(brain, speaker, args.texto, time.perf_counter(), telemetry, state.aircraft)
         speaker.wait()
         return 0
 
@@ -143,7 +167,7 @@ def main() -> int:
                 time.sleep(0.01)
             recording = recorder.stop()
             t0 = time.perf_counter()
-            telemetry, aircraft = state.describe(), state.aircraft
+            telemetry, aircraft = snapshot(state, knowledge), state.aircraft
             if aircraft and aircraft != announced:
                 announced = aircraft
                 print(f"  Avião: {aircraft}" + ("" if knowledge.has_sheet(aircraft) else " (sem ficha na base)"))
@@ -151,6 +175,8 @@ def main() -> int:
             if seconds < MIN_RECORDING_SECONDS:
                 continue
             text = transcriber.transcribe(recording)
+            if config["stt"].get("gravar"):
+                save_recording(recording, text)
             if not text:
                 print(f"  (não entendi nada em {seconds:.1f} s de gravação)")
                 continue

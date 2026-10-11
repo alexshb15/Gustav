@@ -1,0 +1,20 @@
+# Regimes do motor do Bf 109 F-4 (DB 601 E). minutos = 0 significa sem limite.
+# Contínuo e emergência confirmados pela telemetria; combate é da ficha do jogo, de memória.
+
+[[regime]]
+nome = "contínuo"
+ata = 1.15
+rpm = 2300
+minutos = 0
+
+[[regime]]
+nome = "combate"
+ata = 1.30
+rpm = 2500
+minutos = 30
+
+[[regime]]
+nome = "emergência"
+ata = 1.42
+rpm = 2700
+minutos = 1

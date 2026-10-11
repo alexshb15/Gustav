@@ -73,6 +73,13 @@ class FlightState:
         now = time.monotonic() if now is None else now
         return bool(self._indicators) and now - self._last_packet < STALE_SECONDS
 
+    def engine(self) -> tuple[float, float] | None:
+        """(ata, RPM) do primeiro motor, ou None sem telemetria."""
+        with self._lock:
+            if not self.connected() or p.MANIFOLD not in self._indicators:
+                return None
+            return self._first(p.MANIFOLD) / p.PA_PER_ATA, self._first(p.RPM)
+
     def _first(self, indicator: int, default: float = 0.0) -> float:
         values = self._indicators.get(indicator)
         return values[0] if values else default

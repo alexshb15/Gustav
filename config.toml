@@ -15,8 +15,10 @@ tecla = "numpad0"
 [stt]
 modelo = "small"        # tiny, base, small, medium
 threads = 8             # núcleos de CPU usados na transcrição (medido: 1,2 s com 8, 1,4 s com 4)
-# Vocabulário que ajuda o Whisper a acertar termos de aviação.
-dica = "Conversa de piloto com o copiloto Gustav num Bf 109: ata, RPM, flaps, trem de pouso, radiador, travar a bequilha, estabilizador, potência de combate, potência de emergência, MW 50, checklist, decolagem, estol."
+# Guarda cada fala e a transcrição em captures/voz/, para avaliar o reconhecimento.
+gravar = true
+# Vocabulário e frases típicas, que ajudam o Whisper a acertar termos de aviação.
+dica = "Piloto de Bf 109 falando com o copiloto Gustav. Gustav, como está o motor? Como estão os flaps? Posso decolar? Qual a porcentagem do manete para subir? Me passa o checklist de pouso. Qual tecla trava a bequilha? O trem está baixado? Qual minha velocidade? Potência de combate, potência de emergência, regime contínuo, ata, RPM, estabilizador, radiador, estol, artilharia antiaérea."
 
 [llm]
 modelo = "claude-haiku-4-5"

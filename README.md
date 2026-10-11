@@ -85,6 +85,16 @@ Segure a tecla de falar (padrão: `0` do teclado numérico, com NumLock ligado),
 
 Com o jogo aberto e você dentro do avião, cada pergunta vai acompanhada dos instrumentos daquele instante (velocidade, altura sobre o solo, RPM, pressão de admissão, trem, flaps, carga G e atitude). O copiloto também conhece a ficha do avião em `data/aircraft/` e as teclas configuradas no jogo, lidas de `data/input/global.actions`; a pasta do jogo fica em `[jogo]` no config.toml. O copiloto e o sniffer usam as mesmas portas, então não rodam ao mesmo tempo.
 
+O jogo não informa a posição do manete, só a pressão de admissão. Para o copiloto falar de potência em porcentagem do manete, como o HUD mostra, calibre uma vez por avião, em voo nivelado abaixo de 2000 m e com o copiloto fechado:
+
+```
+.venv\Scripts\python tools\calibrar_manete.py
+```
+
+Ele pede por voz cada porcentagem (100, 90, ... 30); ajuste o manete pelo HUD e segure até ouvir "anotado".
+
+Com `gravar = true` em `[stt]`, cada fala e sua transcrição ficam em `captures/voz/`, para avaliar o reconhecimento de voz.
+
 Para testar sem abrir o jogo, reproduza um voo gravado em outro terminal:
 
 ```

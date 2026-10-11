@@ -1,0 +1,15 @@
+# Regimes do motor do Bf 109 G-2 (DB 605 A). minutos = 0 significa sem limite.
+# Nenhum valor confirmado em voo ainda: são da ficha do jogo, de memória.
+# O G-2 não tem regime de emergência; manete todo à frente dá potência de combate.
+
+[[regime]]
+nome = "contínuo"
+ata = 1.15
+rpm = 2300
+minutos = 0
+
+[[regime]]
+nome = "combate"
+ata = 1.30
+rpm = 2600
+minutos = 30
