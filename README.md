@@ -2,7 +2,7 @@
 
 Copiloto de IA por voz para o **IL-2 Sturmovik: Great Battles**. Você fala com ele enquanto voa; ele acompanha a telemetria do avião em tempo real e responde, lê checklists e avisa de problemas.
 
-> **Estado do projeto:** início do desenvolvimento. Telemetria e conversa por voz funcionam, e o copiloto já responde com os instrumentos do avião e as teclas do jogo; alertas e checklists guiados ainda não. O plano completo está em [PLANO.md](PLANO.md).
+> **Estado do projeto:** início do desenvolvimento. Telemetria e conversa por voz funcionam, o copiloto responde com os instrumentos do avião e as teclas do jogo e dá alertas automáticos; checklists guiados ainda não. O plano completo está em [PLANO.md](PLANO.md).
 
 ## O que ele vai fazer
 
@@ -93,6 +93,12 @@ O jogo não informa a posição do manete, só a pressão de admissão. Para o c
 
 Ele pede por voz cada porcentagem (100, 90, ... 30); ajuste o manete pelo HUD e segure até ouvir "anotado".
 
+### Alertas
+
+Com o copiloto aberto, ele avisa sozinho, por cima da conversa: trem recolhido na aproximação, estol, solo próximo em mergulho, carga alta, flaps ou trem baixados em velocidade alta e tempo de emergência ou de combate acabando. Cada alerta também aparece no terminal com a hora.
+
+Diga "silêncio" para calar os alertas (em combate, por exemplo) e "pode falar" para religá-los. Para desligar uma regra de vez, liste o nome dela em `desligados`, em `[alertas]` do config.toml; os limites de cada avião ficam em `[alertas]` do arquivo `.toml` dele em `data/aircraft/`.
+
 Com `gravar = true` em `[stt]`, cada fala e sua transcrição ficam em `captures/voz/`, para avaliar o reconhecimento de voz.
 
 Para testar sem abrir o jogo, reproduza um voo gravado em outro terminal:
@@ -132,8 +138,8 @@ Transcrição e voz rodam em CPU para deixar a placa de vídeo livre para o VR.
 |---|---|---|
 | 0 | Captura e decodificação da telemetria UDP | Concluída |
 | 1 | Conversa por voz, ainda sem dados do jogo | Concluída |
-| 2 | Copiloto respondendo com dados reais do voo | Implementada, falta validar em voo |
-| 3 | Alertas proativos | A fazer |
+| 2 | Copiloto respondendo com dados reais do voo | Concluída |
+| 3 | Alertas proativos | Implementada, falta validar em voo |
 | 4 | Checklists guiados e demais variantes do Bf 109 | A fazer |
 | 5 | Navegação e leitura de tela (opcional) | A fazer |
 

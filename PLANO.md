@@ -178,16 +178,32 @@ Validada em VR: perda de FPS pequena; transcrição em 1,2 a 1,4 s e início da 
 - Medir latência ponta a ponta e ajustar modelo de STT.
 - **Critério de saída:** conversa fluida em PT-BR com o jogo rodando em VR, sem queda de FPS nem reprojeção perceptível.
 
-### Fase 2 — Copiloto com dados reais (implementada; falta validar em voo e revisar as fichas)
+### Fase 2 — Copiloto com dados reais (validada em voo em 11/10/2026; falta revisar as fichas)
 
-Testada com o voo gravado reproduzido pelo `tools/replay.py`. As fichas do F-4 e do G-2 foram escritas de memória, porque as especificações do jogo estão em arquivos empacotados: os valores marcados "aprox." precisam ser conferidos com a ficha que o jogo mostra.
+As fichas do F-4 e do G-2 foram escritas de memória, porque as especificações do jogo estão em arquivos empacotados: os valores marcados "aprox." precisam ser conferidos com a ficha que o jogo mostra.
 
 - Ligar coletor + estado do voo às ferramentas do Claude.
 - Base de conhecimento para o Bf 109 F-4 e o G-2, montada a partir das especificações do próprio jogo. As outras variantes entram na Fase 4.
 - Leitura do arquivo de controles em `data/input` para responder "qual tecla faz X?".
 - **Critério de saída:** perguntar "como está o motor?" em voo e receber resposta correta com os números reais.
 
-### Fase 3 — Alertas proativos (3–4 dias)
+### Fase 3 — Alertas proativos (implementada; falta validar em voo)
+
+Regras em `src/copilot/alerts/engine.py`, avaliadas 10 vezes por segundo, com frases sintetizadas de antemão que falam por cima da conversa. Rodadas sobre o voo gravado de 08/10, dispararam 12 vezes em 11 minutos, todas em situações reais. Limites em `[alertas]` na ficha de cada avião; regras desligáveis em `[alertas]` do config.toml.
+
+| Regra | Dispara quando | Frase |
+|---|---|---|
+| `trem_recolhido` | Abaixo de 150 m, menos de 260 km/h, potência reduzida e descendo há 2 s, com o trem em cima | "Trem recolhido!" |
+| `solo` | Menos de 3 s até o chão na razão de descida atual | "Puxa! Solo!" |
+| `estol` | Ângulo de ataque de 15° ou mais em voo | "Estol!" |
+| `carga_g` | 8 G ou mais | "Carga alta!" |
+| `flaps_velocidade` | Flaps baixados acima de 270 km/h | "Flaps baixados, velocidade alta." |
+| `trem_velocidade` | Trem baixado acima de 370 km/h | "Trem baixado, velocidade alta." |
+| `tempo_motor` | Metade e fim do tempo de emergência; 5 e 1 minuto para o fim do de combate | "Emergência: 30 segundos." etc. |
+| `impacto`, `dano` | Eventos 6 e 7 da telemetria, nunca vistos em voo | "Fomos atingidos!", "Dano no avião!" |
+
+O cronômetro do motor é um modelo simples, não o do jogo: o tempo corre no regime ou acima dele e é devolvido no mesmo ritmo com o motor no contínuo. O comando de voz "silêncio" cala todos os alertas e "pode falar" os religa; os dois são tratados sem ir ao Claude.
+
 - Motor de regras: trem recolhido em aproximação, estol iminente (AoA), excesso de G, tempo em potência de emergência/combate, flaps acima da velocidade limite, dano recebido, altura baixa em mergulho.
 - Prioridades, tempo mínimo entre repetições e comando de voz "silêncio" para o combate.
 - **Critério de saída:** alertas corretos em 10 voos de teste, sem falsos positivos irritantes.
@@ -243,8 +259,9 @@ Apertar teclas pelo copiloto está fora do escopo por decisão sua.
 
 ## 10. Próximo passo
 
-As Fases 0 e 1 estão concluídas e a Fase 2 está implementada. Para fechá-la:
+As Fases 0 a 2 estão concluídas e a Fase 3 está implementada. Para fechá-la:
 
-1. Voar com o copiloto ligado e perguntar "como está o motor?" em regimes diferentes, conferindo com os instrumentos.
-2. Conferir as fichas em `data/aircraft/` com a ficha do F-4 e do G-2 no jogo e corrigir os valores marcados "aprox.".
-3. Depois, começar a Fase 3 (alertas proativos), incluindo o cronômetro de tempo em potência de emergência e de combate.
+1. Calibrar o manete com `tools/calibrar_manete.py`, para o copiloto falar de potência em porcentagem.
+2. Voar com os alertas ligados e anotar os que faltaram e os que incomodaram (critério: 10 voos sem falsos positivos irritantes).
+3. Conferir as fichas e os limites de alerta em `data/aircraft/` com a ficha do F-4 e do G-2 no jogo.
+4. Voar uma missão com dano de combate, para confirmar os eventos de impacto e dano.

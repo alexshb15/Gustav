@@ -18,3 +18,10 @@ nome = "emergência"
 ata = 1.42
 rpm = 2700
 minutos = 1
+
+# Limites dos alertas automáticos. Valores aproximados, a conferir com a ficha do jogo.
+[alertas]
+aoa_estol = 15.0    # graus de ângulo de ataque para o aviso de estol
+carga_g = 8.0       # carga para o aviso de G
+flaps_kmh = 250.0   # velocidade máxima com flaps baixados
+trem_kmh = 350.0    # velocidade máxima com trem baixado

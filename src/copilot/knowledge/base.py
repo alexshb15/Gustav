@@ -34,6 +34,7 @@ class Knowledge:
         self.keybinds = load_keybinds(game_dir) if game_dir else ""
         self._prompts: dict[str, str] = {}
         self._engines: dict[str, tuple] = {}
+        self._limits: dict[str, dict] = {}
 
     def _read(self, name: str) -> str | None:
         path = self.aircraft_dir / f"{name}.md"
@@ -48,15 +49,27 @@ class Knowledge:
         if key not in self._engines:
             regimes, points = [], []
             path = self.aircraft_dir / f"{key}.toml"
+            self._limits[key] = {}
             if key and path.exists():
                 with path.open("rb") as f:
-                    regimes = sorted(tomllib.load(f).get("regime", []), key=lambda r: r["ata"])
+                    data = tomllib.load(f)
+                regimes = sorted(data.get("regime", []), key=lambda r: r["ata"])
+                self._limits[key] = data.get("alertas", {})
             path = self.aircraft_dir / f"{key}.manete.json"
             if key and path.exists():
                 points = sorted((p["manete"], p["ata"])
                                 for p in json.loads(path.read_text(encoding="utf-8"))["pontos"])
             self._engines[key] = (regimes, points)
         return self._engines[key]
+
+    def regimes(self, aircraft: str | None) -> list[dict]:
+        """Regimes do motor em ordem crescente de pressão; vazio se o avião não tem ficha."""
+        return self._engine(aircraft)[0]
+
+    def alert_limits(self, aircraft: str | None) -> dict:
+        """Limites de alerta definidos na ficha do avião (tabela [alertas])."""
+        self._engine(aircraft)
+        return self._limits[slug(aircraft) if aircraft else ""]
 
     def throttle_for(self, aircraft: str | None, ata: float) -> float | None:
         """Porcentagem do manete que dá `ata`, pela calibração; None se não houver."""

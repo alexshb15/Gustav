@@ -18,7 +18,7 @@ threads = 8             # núcleos de CPU usados na transcrição (medido: 1,2 s
 # Guarda cada fala e a transcrição em captures/voz/, para avaliar o reconhecimento.
 gravar = true
 # Vocabulário e frases típicas, que ajudam o Whisper a acertar termos de aviação.
-dica = "Piloto de Bf 109 falando com o copiloto Gustav. Gustav, como está o motor? Como estão os flaps? Posso decolar? Qual a porcentagem do manete para subir? Me passa o checklist de pouso. Qual tecla trava a bequilha? O trem está baixado? Qual minha velocidade? Potência de combate, potência de emergência, regime contínuo, ata, RPM, estabilizador, radiador, estol, artilharia antiaérea."
+dica = "Piloto de Bf 109 falando com o copiloto Gustav. Gustav, como está o motor? Como estão os flaps? Posso decolar? Qual a porcentagem do manete para subir? Me passa o checklist de pouso. Qual tecla trava a bequilha? O trem está baixado? Qual minha velocidade? Gustav, silêncio. Pode falar. Potência de combate, potência de emergência, regime contínuo, ata, RPM, estabilizador, radiador, estol, artilharia antiaérea."
 
 [llm]
 modelo = "claude-haiku-4-5"
@@ -29,6 +29,14 @@ turnos_de_memoria = 10  # trocas anteriores enviadas a cada pergunta
 voz = "pt_BR-faber-medium"   # baixada em models/
 volume = 1.0
 velocidade = 1.0             # acima de 1 fala mais rápido
+
+[alertas]
+# Avisos automáticos, sem passar pelo Claude. Em voo, diga "silêncio" para calar
+# e "pode falar" para voltar.
+ativos = true
+# Regras a desligar, pelos nomes: trem_recolhido, solo, estol, carga_g,
+# flaps_velocidade, trem_velocidade, tempo_motor, impacto, dano.
+desligados = []
 
 [sistema]
 # Roda o copiloto com prioridade abaixo do normal para não disputar CPU com o jogo.

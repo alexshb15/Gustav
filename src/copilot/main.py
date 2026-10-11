@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+import re
 import sys
+import threading
 import time
 import tomllib
 import wave
@@ -23,6 +25,11 @@ from dotenv import load_dotenv
 ROOT = Path(__file__).resolve().parents[2]
 MIN_RECORDING_SECONDS = 0.3
 BELOW_NORMAL_PRIORITY_CLASS = 0x4000
+ALERT_STEP_SECONDS = 0.1
+# Comandos de voz tratados aqui mesmo, sem ir ao Claude. Só valem em falas curtas.
+MUTE_COMMAND = re.compile(r"\b(sil[êe]ncio|cala a boca|fica quieto|sem alertas?)\b", re.IGNORECASE)
+UNMUTE_COMMAND = re.compile(r"\b(pode falar|volta a falar|liga os alertas?|alertas? de volta)\b", re.IGNORECASE)
+COMMAND_MAX_WORDS = 5
 
 
 def load_config() -> dict:
@@ -38,12 +45,31 @@ def voice_path(name: str) -> Path:
     return path
 
 
-def snapshot(state, knowledge) -> str:
+def snapshot(state, knowledge, alerts=None) -> str:
     """Retrato dos instrumentos, com o regime do motor já classificado pela ficha do avião."""
-    text = state.describe()
+    lines = [state.describe()]
     engine = state.engine()
-    line = knowledge.engine_line(state.aircraft, engine[0]) if engine and engine[1] >= 50 else None
-    return f"{text}\n{line}" if line else text
+    if engine and engine[1] >= 50:
+        lines.append(knowledge.engine_line(state.aircraft, engine[0]))
+        if alerts:
+            lines.append(alerts.timers_line(state.aircraft))
+    if alerts and alerts.muted:
+        lines.append("Alertas automáticos: em silêncio a pedido do piloto")
+    return "\n".join(line for line in lines if line)
+
+
+def run_alerts(state, alerts, speaker):
+    """Laço dos alertas: avalia as regras 10 vezes por segundo e fala por cima da conversa."""
+    prepared_for = object()
+    while True:
+        time.sleep(ALERT_STEP_SECONDS)
+        aircraft = state.aircraft
+        if aircraft != prepared_for:
+            speaker.prepare(alerts.phrases(aircraft))
+            prepared_for = aircraft
+        for text in alerts.step(state.reading(), aircraft, time.monotonic()):
+            print(f"\n  !! {datetime.now():%H:%M:%S} ALERTA: {text}")
+            speaker.alert(text)
 
 
 def save_recording(recording, text: str):
@@ -154,7 +180,14 @@ def main() -> int:
     transcriber = Transcriber(config["stt"]["modelo"], config["stt"]["threads"], config["stt"]["dica"])
     recorder = audio.Recorder(audio.find_device(config["audio"]["microfone"], "input"))
     ptt = PushToTalk(config["ptt"]["tecla"])
-    print(f"Pronto. Segure {config['ptt']['tecla']} para falar; Ctrl+C encerra.")
+    alerts = None
+    if config["alertas"]["ativos"]:
+        from .alerts.engine import AlertEngine
+        alerts = AlertEngine(knowledge, tuple(config["alertas"]["desligados"]))
+        speaker.prepare(alerts.phrases(state.aircraft))
+        threading.Thread(target=run_alerts, args=(state, alerts, speaker), daemon=True, name="alertas").start()
+    print(f"Pronto. Segure {config['ptt']['tecla']} para falar; Ctrl+C encerra."
+          + (' Alertas ligados: diga "silêncio" para calar e "pode falar" para voltar.' if alerts else ""))
 
     announced = None
     try:
@@ -167,7 +200,7 @@ def main() -> int:
                 time.sleep(0.01)
             recording = recorder.stop()
             t0 = time.perf_counter()
-            telemetry, aircraft = snapshot(state, knowledge), state.aircraft
+            telemetry, aircraft = snapshot(state, knowledge, alerts), state.aircraft
             if aircraft and aircraft != announced:
                 announced = aircraft
                 print(f"  Avião: {aircraft}" + ("" if knowledge.has_sheet(aircraft) else " (sem ficha na base)"))
@@ -181,6 +214,14 @@ def main() -> int:
                 print(f"  (não entendi nada em {seconds:.1f} s de gravação)")
                 continue
             print(f"Você: {text}\n  [{seconds:.1f} s de fala, transcrita em {time.perf_counter() - t0:.2f} s]")
+            if alerts and len(text.split()) <= COMMAND_MAX_WORDS:
+                mute = bool(MUTE_COMMAND.search(text))
+                if mute or UNMUTE_COMMAND.search(text):
+                    alerts.muted = mute
+                    reply = "Alertas em silêncio." if mute else "Alertas ligados."
+                    print(f"Gustav: {reply}")
+                    speaker.say(reply)
+                    continue
             answer(brain, speaker, text, t0, telemetry, aircraft, interrupted=ptt.pressed)
     except KeyboardInterrupt:
         pass

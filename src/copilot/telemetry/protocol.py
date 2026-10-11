@@ -46,7 +46,11 @@ INDICATORS = {
 }
 
 AIRCRAFT_NAME = 0
+HIT = 6
+DAMAGE = 7
 GUN_FIRE = 9
+# Impacto e dano: IDs presumidos, nunca vistos em voo.
+ALERT_EVENTS = {HIT, DAMAGE}
 # Reenviados pelo jogo a cada ~10 s; ao vivo só aparecem quando mudam.
 SETUP_EVENTS = {0, 1, 2, 3, 13, 14}
 

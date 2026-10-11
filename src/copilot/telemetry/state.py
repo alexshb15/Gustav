@@ -6,6 +6,7 @@ import math
 import threading
 import time
 from collections import deque
+from dataclasses import dataclass
 
 from . import protocol as p
 
@@ -31,6 +32,23 @@ def _height(agl: float) -> str:
     return _round(agl, 10) if agl >= 100 else _round(agl, 1)
 
 
+@dataclass
+class Reading:
+    """Um instante dos instrumentos, em unidades de piloto."""
+    ias: float          # km/h
+    agl: float          # m sobre o terreno
+    rpm: float
+    ata: float
+    load: float         # carga em G
+    sink: float         # razão de descida em m/s (positiva descendo), pela altura sobre o terreno
+    flaps: float        # 0..1
+    aoa: float          # graus
+    gear_down: float    # 0..1, a perna principal menos baixada
+    gear_up: bool       # as duas pernas principais recolhidas
+    on_ground: bool
+    events: list[int]   # eventos de impacto e dano desde a última leitura
+
+
 class FlightState:
     """Atualizado pela thread do receptor; lido pela conversa e, depois, pelos alertas."""
 
@@ -43,6 +61,9 @@ class FlightState:
         self._last_sample = 0.0
         # (instante, km/h, m AGL, rpm, ata, carga G)
         self._history: deque = deque(maxlen=int(HISTORY_SECONDS / SAMPLE_SECONDS))
+        # (instante, m AGL) do último segundo e pouco, para a razão de descida
+        self._agl_track: deque = deque(maxlen=40)
+        self._events: list[int] = []
         self.aircraft: str | None = None
 
     def on_telemetry(self, tick: int, indicators: dict, events: list, now: float | None = None):
@@ -53,13 +74,18 @@ class FlightState:
                 # o tick volta a zero quando a missão recomeça, e os pacotes param
                 # quando o piloto sai do avião: nos dois casos é outro voo
                 self._history.clear()
+                self._agl_track.clear()
                 self._indicators = {}
             self._last_tick = tick
             self._last_packet = now
             self._indicators.update(indicators)
+            if p.AGL in indicators:
+                self._agl_track.append((now, indicators[p.AGL][0]))
             for event_id, payload in events:
                 if event_id == p.AIRCRAFT_NAME and payload:
                     self.aircraft = payload[1:].split(b"\x00")[0].decode("ascii", "replace")
+                elif event_id in p.ALERT_EVENTS:
+                    self._events.append(event_id)
             if now - self._last_sample >= SAMPLE_SECONDS and p.EAS in self._indicators:
                 self._last_sample = now
                 self._history.append((now, *self._sample()))
@@ -79,6 +105,27 @@ class FlightState:
             if not self.connected() or p.MANIFOLD not in self._indicators:
                 return None
             return self._first(p.MANIFOLD) / p.PA_PER_ATA, self._first(p.RPM)
+
+    def reading(self, now: float | None = None) -> Reading | None:
+        """Valores numéricos para o motor de alertas; None sem telemetria."""
+        now = time.monotonic() if now is None else now
+        with self._lock:
+            if not self.connected(now) or p.EAS not in self._indicators:
+                return None
+            ias, agl, rpm, ata, load = self._sample()
+            gear = self._indicators.get(p.GEAR, (0.0, 0.0))
+            press = self._indicators.get(p.GEAR_PRESS, (0.0, 0.0))
+            sink = 0.0
+            if len(self._agl_track) >= 2:
+                (t0, a0), (t1, a1) = self._agl_track[0], self._agl_track[-1]
+                if t1 - t0 >= 0.5:
+                    sink = (a0 - a1) / (t1 - t0)
+            events, self._events = self._events, []
+            return Reading(
+                ias=ias, agl=agl, rpm=rpm, ata=ata, load=load, sink=sink,
+                flaps=self._first(p.FLAPS), aoa=math.degrees(self._first(p.AOA)),
+                gear_down=min(gear[:2]), gear_up=max(gear[:2]) < 0.02,
+                on_ground=any(v > 0.05 for v in press[:2]), events=events)
 
     def _first(self, indicator: int, default: float = 0.0) -> float:
         values = self._indicators.get(indicator)
