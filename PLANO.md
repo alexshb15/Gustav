@@ -148,6 +148,10 @@ Essa lacuna define o que o copiloto consegue ou não fazer. Formas de cobri-la, 
 
 ## 6. Ferramentas expostas ao Claude
 
+**Decisão da Fase 2:** o estado do voo, a ficha do avião, os checklists e as teclas não são ferramentas. O retrato dos instrumentos vai junto de cada pergunta, e a ficha e as teclas ficam no prompt de sistema, com cache. Cada chamada de ferramenta custaria uma ida e volta a mais ao modelo (cerca de 1 s), e a conversa já está no limite da meta de 2 s. Ferramentas ficam para o que precisa de ação: `set_timer` e `set_alert` na Fase 4 e `capture_screen` na Fase 5.
+
+Lista original, para referência:
+
 - `get_flight_state()` — retrato atual: velocidade, AGL, RPM, admissão, trem, flaps, G, atitude.
 - `get_flight_history(segundos)` — tendência recente (subindo? perdendo velocidade?).
 - `get_aircraft_data(topico)` — limites de motor, velocidades, procedimentos do avião atual.
@@ -166,12 +170,18 @@ O prompt de sistema define o personagem: copiloto de rádio, frases curtas, unid
 - **Critério de saída:** script que imprime velocidade, AGL, RPM, trem e flaps ao vivo durante um voo.
 - Esta fase decide o resto: se algum campo esperado não existir, as fases 3 e 5 são ajustadas.
 
-### Fase 1 — Conversa por voz, sem jogo (2–3 dias)
+### Fase 1 — Conversa por voz, sem jogo (concluída em 11/10/2026)
+
+Validada em VR: perda de FPS pequena; transcrição em 1,2 a 1,4 s e início da fala entre 2,0 e 2,5 s depois de soltar a tecla.
+
 - PTT no joystick → Whisper → Claude (streaming) → Piper.
 - Medir latência ponta a ponta e ajustar modelo de STT.
 - **Critério de saída:** conversa fluida em PT-BR com o jogo rodando em VR, sem queda de FPS nem reprojeção perceptível.
 
-### Fase 2 — Copiloto com dados reais (3–4 dias)
+### Fase 2 — Copiloto com dados reais (implementada; falta validar em voo e revisar as fichas)
+
+Testada com o voo gravado reproduzido pelo `tools/replay.py`. As fichas do F-4 e do G-2 foram escritas de memória, porque as especificações do jogo estão em arquivos empacotados: os valores marcados "aprox." precisam ser conferidos com a ficha que o jogo mostra.
+
 - Ligar coletor + estado do voo às ferramentas do Claude.
 - Base de conhecimento para o Bf 109 F-4 e o G-2, montada a partir das especificações do próprio jogo. As outras variantes entram na Fase 4.
 - Leitura do arquivo de controles em `data/input` para responder "qual tecla faz X?".
@@ -233,9 +243,8 @@ Apertar teclas pelo copiloto está fora do escopo por decisão sua.
 
 ## 10. Próximo passo
 
-A Fase 0 está concluída e a seção 4 reflete o que foi medido. Executar a Fase 1:
+As Fases 0 e 1 estão concluídas e a Fase 2 está implementada. Para fechá-la:
 
-1. Definir a chave da API da Anthropic em `ANTHROPIC_API_KEY`.
-2. Escolher o botão do HOTAS para o push-to-talk e anotar os dispositivos de áudio (microfone e saída do headset).
-3. Criar o `pyproject.toml` e o esqueleto de `src/copilot/`.
-4. Montar a cadeia PTT → Whisper → Claude → Piper e medir a latência.
+1. Voar com o copiloto ligado e perguntar "como está o motor?" em regimes diferentes, conferindo com os instrumentos.
+2. Conferir as fichas em `data/aircraft/` com a ficha do F-4 e do G-2 no jogo e corrigir os valores marcados "aprox.".
+3. Depois, começar a Fase 3 (alertas proativos), incluindo o cronômetro de tempo em potência de emergência e de combate.

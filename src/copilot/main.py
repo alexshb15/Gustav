@@ -1,4 +1,4 @@
-"""Gustav, Fase 1: conversa por voz com push-to-talk, ainda sem dados do jogo.
+"""Gustav: conversa por voz com push-to-talk, com a telemetria do jogo a cada pergunta.
 
 Uso:
     python -m copilot.main                  # segure a tecla de PTT para falar
@@ -36,7 +36,8 @@ def voice_path(name: str) -> Path:
     return path
 
 
-def answer(brain, speaker, user_text: str, t0: float, interrupted=lambda: False):
+def answer(brain, speaker, user_text: str, t0: float, telemetry: str | None = None,
+           aircraft: str | None = None, interrupted=lambda: False):
     """Envia a pergunta, fala a resposta frase a frase e mostra a latência."""
     timing = {}
 
@@ -45,7 +46,7 @@ def answer(brain, speaker, user_text: str, t0: float, interrupted=lambda: False)
 
     print("Gustav: ", end="", flush=True)
     try:
-        for sentence in brain.reply(user_text):
+        for sentence in brain.reply(user_text, telemetry, aircraft):
             timing.setdefault("llm", time.perf_counter())
             print(sentence, end=" ", flush=True)
             speaker.say(sentence, audio_started if "audio" not in timing else None)
@@ -92,17 +93,33 @@ def main() -> int:
         kernel32.SetPriorityClass(kernel32.GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS)
 
     from .brain.client import Brain
+    from .knowledge.base import Knowledge
+    from .telemetry.receiver import start_receiver
+    from .telemetry.state import FlightState
     from .voice.tts import Speaker
+
+    game_dir = Path(config["jogo"]["pasta"])
+    knowledge = Knowledge(ROOT / "data", game_dir if game_dir.exists() else None)
+    if not knowledge.keybinds:
+        print(f"Aviso: não li as teclas do jogo em {game_dir}; confira [jogo] no config.toml.")
+    state = FlightState()
+    try:
+        start_receiver(state)
+    except OSError as e:
+        print(f"Aviso: sem telemetria, não consegui abrir as portas UDP ({e}). "
+              "O sniffer ou outro programa está usando as portas?")
 
     print("Carregando voz...")
     speaker = Speaker(voice_path(config["tts"]["voz"]),
                       audio.find_device(config["audio"]["saida"], "output"),
                       config["tts"]["volume"], config["tts"]["velocidade"])
-    brain = Brain(config["llm"]["modelo"], config["llm"]["max_tokens"],
+    brain = Brain(knowledge, config["llm"]["modelo"], config["llm"]["max_tokens"],
                   config["llm"]["turnos_de_memoria"])
 
     if args.texto:
-        answer(brain, speaker, args.texto, time.perf_counter())
+        time.sleep(1.5)  # tempo para a telemetria chegar, se houver
+        print(state.describe())
+        answer(brain, speaker, args.texto, time.perf_counter(), state.describe(), state.aircraft)
         speaker.wait()
         return 0
 
@@ -115,6 +132,7 @@ def main() -> int:
     ptt = PushToTalk(config["ptt"]["tecla"])
     print(f"Pronto. Segure {config['ptt']['tecla']} para falar; Ctrl+C encerra.")
 
+    announced = None
     try:
         while True:
             while not ptt.pressed():
@@ -125,6 +143,10 @@ def main() -> int:
                 time.sleep(0.01)
             recording = recorder.stop()
             t0 = time.perf_counter()
+            telemetry, aircraft = state.describe(), state.aircraft
+            if aircraft and aircraft != announced:
+                announced = aircraft
+                print(f"  Avião: {aircraft}" + ("" if knowledge.has_sheet(aircraft) else " (sem ficha na base)"))
             seconds = recording.size / audio.STT_SAMPLE_RATE
             if seconds < MIN_RECORDING_SECONDS:
                 continue
@@ -133,7 +155,7 @@ def main() -> int:
                 print(f"  (não entendi nada em {seconds:.1f} s de gravação)")
                 continue
             print(f"Você: {text}\n  [{seconds:.1f} s de fala, transcrita em {time.perf_counter() - t0:.2f} s]")
-            answer(brain, speaker, text, t0, interrupted=ptt.pressed)
+            answer(brain, speaker, text, t0, telemetry, aircraft, interrupted=ptt.pressed)
     except KeyboardInterrupt:
         pass
     finally:

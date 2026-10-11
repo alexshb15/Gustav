@@ -2,7 +2,7 @@
 
 Copiloto de IA por voz para o **IL-2 Sturmovik: Great Battles**. Você fala com ele enquanto voa; ele acompanha a telemetria do avião em tempo real e responde, lê checklists e avisa de problemas.
 
-> **Estado do projeto:** início do desenvolvimento. A captura de telemetria (Fase 0) está concluída e validada em voo; voz, conversa e alertas ainda não. O plano completo está em [PLANO.md](PLANO.md).
+> **Estado do projeto:** início do desenvolvimento. Telemetria e conversa por voz funcionam, e o copiloto já responde com os instrumentos do avião e as teclas do jogo; alertas e checklists guiados ainda não. O plano completo está em [PLANO.md](PLANO.md).
 
 ## O que ele vai fazer
 
@@ -63,7 +63,7 @@ O [tools/sniff_telemetry.py](tools/sniff_telemetry.py) escuta a telemetria do jo
 
 Opções: `--no-record` só mostra, sem gravar; `--raw` despeja cada pacote em hexadecimal.
 
-## Conversa por voz (Fase 1)
+## Conversa por voz
 
 Instalação, uma vez, na pasta do projeto:
 
@@ -82,6 +82,14 @@ Crie um arquivo `.env` com `ANTHROPIC_API_KEY=...` e ajuste microfone, saída de
 Segure a tecla de falar (padrão: `0` do teclado numérico, com NumLock ligado), faça a pergunta e solte. Apertar a tecla de novo interrompe a resposta. A cada troca o terminal mostra a transcrição e a latência.
 
 `--texto "pergunta"` responde a uma pergunta digitada; `--dispositivos` lista microfones e saídas de áudio.
+
+Com o jogo aberto e você dentro do avião, cada pergunta vai acompanhada dos instrumentos daquele instante (velocidade, altura sobre o solo, RPM, pressão de admissão, trem, flaps, carga G e atitude). O copiloto também conhece a ficha do avião em `data/aircraft/` e as teclas configuradas no jogo, lidas de `data/input/global.actions`; a pasta do jogo fica em `[jogo]` no config.toml. O copiloto e o sniffer usam as mesmas portas, então não rodam ao mesmo tempo.
+
+Para testar sem abrir o jogo, reproduza um voo gravado em outro terminal:
+
+```
+python tools/replay.py captures/voo-AAAAMMDD-HHMMSS.il2rec --inicio 150
+```
 
 ## Limites conhecidos
 
@@ -113,8 +121,8 @@ Transcrição e voz rodam em CPU para deixar a placa de vídeo livre para o VR.
 | Fase | Entrega | Estado |
 |---|---|---|
 | 0 | Captura e decodificação da telemetria UDP | Concluída |
-| 1 | Conversa por voz, ainda sem dados do jogo | Implementada, falta validar em voo |
-| 2 | Copiloto respondendo com dados reais do voo | A fazer |
+| 1 | Conversa por voz, ainda sem dados do jogo | Concluída |
+| 2 | Copiloto respondendo com dados reais do voo | Implementada, falta validar em voo |
 | 3 | Alertas proativos | A fazer |
 | 4 | Checklists guiados e demais variantes do Bf 109 | A fazer |
 | 5 | Navegação e leitura de tela (opcional) | A fazer |

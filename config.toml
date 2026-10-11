@@ -31,3 +31,7 @@ velocidade = 1.0             # acima de 1 fala mais rápido
 [sistema]
 # Roda o copiloto com prioridade abaixo do normal para não disputar CPU com o jogo.
 prioridade_baixa = true
+
+[jogo]
+# Pasta de instalação do IL-2; de data/input saem as teclas configuradas.
+pasta = 'E:\SteamLibrary\steamapps\common\IL-2 Sturmovik Battle of Stalingrad'
